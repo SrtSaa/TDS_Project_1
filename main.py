@@ -7,6 +7,7 @@ from typing import List, Optional
 import requests
 from github import Github, GithubException
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 # --- Load Environment Variables ---
 # For local testing, create a .env file. For Hugging Face, set these in the Space secrets.
@@ -14,12 +15,11 @@ load_dotenv()
 
 MY_SECRET = os.getenv("MY_SECRET")
 GITHUB_PAT = os.getenv("GITHUB_PAT")
-AIPipe_API_KEY = os.getenv("AIPipe_API_KEY")
-AIPipe_API_URL = os.getenv("AIPipe_API_URL")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # A startup check to ensure essential variables are loaded.
-if not all([MY_SECRET, GITHUB_PAT, AIPipe_API_KEY]):
-    print("WARNING: One or more environment variables (MY_SECRET, GITHUB_PAT, AIPipe_API_KEY) are not set.")
+if not all([MY_SECRET, GITHUB_PAT, GOOGLE_API_KEY]):
+    print("WARNING: One or more environment variables (MY_SECRET, GITHUB_PAT, GOOGLE_API_KEY) are not set.")
 
 # --- Pydantic Models for Data Validation ---
 class Attachment(BaseModel):
@@ -228,16 +228,12 @@ The application will be evaluated against these checks:
 4.  Output ONLY the raw code for the `index.html` file. Do not include any explanations, greetings, or markdown formatting like ```html.
 """
 
-    headers = {"Authorization": f"Bearer {AIPipe_API_KEY}", "Content-Type": "application/json"}
-    data = {"model": "gpt-4o", "messages": [{"role": "user", "content": prompt}]}
-
     try:
-        print("Sending request to LLM API...")
-        response = requests.post(AIPipe_API_URL, headers=headers, json=data, timeout=120)
-        response.raise_for_status()
-        result = response.json()
-        generated_code = result['choices'][0]['message']['content']
-        
+        genai.configure(api_key=GOOGLE_API_KEY)
+        model = genai.GenerativeModel('gemini-pro-latest')
+        response = model.generate_content(prompt)
+        generated_code = response.text
+
         if generated_code.startswith("```html"):
             generated_code = generated_code.split("\n", 1)[1]
         if generated_code.endswith("```"):
